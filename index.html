@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="ko" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title data-i18n="top.docTitle"></title>
+  <style>
+    /* 다크 테마 고정(work-log 96절): 라이트 테마와 전환 단추는 없앰 */
+    :root {
+      --bg-primary: #070b14;
+      --bg-glass: rgba(11, 18, 32, 0.78);
+      --bg-glass-strong: rgba(10, 16, 28, 0.92);
+      --bg-card: rgba(20, 30, 50, 0.65);
+      --bg-card-hover: rgba(30, 45, 72, 0.8);
+      --bg-input: rgba(8, 13, 24, 0.85);
+      --border-subtle: rgba(100, 150, 220, 0.22);
+      --border-strong: rgba(56, 189, 248, 0.55);
+      --text-primary: #e8f0fe;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --accent-cyan: #38bdf8;
+      --accent-blue: #3b82f6;
+      --accent-emerald: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-rose: #f43f5e;
+      --accent-purple: #a855f7;
+      --shadow-glass: 0 8px 32px rgba(0, 0, 0, 0.55);
+      --font-sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      overflow-x: hidden;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.4;
+      user-select: none;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    #canvas-container canvas {
+      display: block;
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* 초점 기체 통신 두절(재돌입 플라스마, render/entry-fx.js entryFxBlackout → ui-controller.js updateTelemetryUI) */
+    #entry-fx-blackout {
+      position: absolute;
+      top: 9%;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 4px 12px;
+      font: 600 13px/1.4 ui-monospace, Menlo, monospace;
+      letter-spacing: 0.12em;
+      color: #ffb38a;
+      background: rgba(20, 6, 2, 0.55);
+      border: 1px solid rgba(255, 140, 80, 0.55);
+      border-radius: 3px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #entry-fx-blackout[hidden] {
+      display: none;
+    }
+
+    /* Procedural Texture Generation Loading Bar */
+    #tex-loading-overlay {
+      position: fixed;
+      top: 54px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 40;
+      background: var(--bg-glass-strong);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: opacity 0.3s ease;
+      pointer-events: none;
+    }
+    #tex-loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+    .tex-progress-bar {
+      width: 120px;
+      height: 6px;
+      background: rgba(148, 163, 184, 0.25);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .tex-progress-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-emerald));
+      transition: width 0.1s linear;
+    }
+
+    /* Top Mission Sequence Bar */
+    #top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 46px;
+      z-index: 20;
+      background: var(--bg-glass-strong);
+      border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 10px;
+      gap: 8px;
+      overflow: hidden;
+    }
+
+    /* camera picker under the top-bar camera button */
+    #camera-menu {
+      position: fixed;
+      z-index: 30;
+      width: 300px;
+      letter-spacing: normal;
+      padding: 5px;
+      background: var(--bg-glass-strong);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    #camera-menu[hidden] { display: none; }
+    .cam-item {
+      display: block;
+      width: 100%;
+      text-align: left;
+      padding: 7px 9px 7px 26px;
+      position: relative;
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 7px;
+      color: var(--text-primary);
+      font: inherit;
+      cursor: pointer;
+    }
+    .cam-item:hover, .cam-item:focus-visible { background: var(--bg-card); outline: none; border-color: var(--border-subtle); }
+    .cam-item.current { border-color: var(--accent-cyan); }
+    .cam-item.current::before {
+      content: "✓";
+      position: absolute;
+      left: 9px;
+      top: 7px;
+      font-size: 12px;
+      color: var(--accent-cyan);
+    }
+    .cam-name { font-size: 12px; font-weight: 700; }
+    .cam-desc { font-size: 10.5px; color: var(--text-secondary); margin-top: 2px; line-height: 1.35; }
+    .cam-targets { display: flex; gap: 4px; padding: 2px 9px 6px 26px; }
+    .cam-target {
+      flex: 1;
+      padding: 3px 0;
+      font: inherit;
+      font-size: 11px;
+      color: var(--text-secondary);
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .cam-target.current { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+    .cam-hint { font-size: 10px; color: var(--text-secondary); padding: 4px 9px 2px; border-top: 1px solid var(--border-subtle); margin-top: 3px; }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .brand-title {
+      font-weight: 800;
+      font-size: 13px;
+      letter-spacing: 0.03em;
+      color: var(--accent-cyan);
+      white-space: nowrap;
+    }
+
+    .met-box {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-subtle);
+      color: var(--accent-emerald);
+      white-space: nowrap;
+    }
+
+    /* Sequence Strip */
+    .seq-strip {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex: 1;
+      justify-content: center;
+    }
+    .seq-strip::-webkit-scrollbar {
+      display: none;
+    }
+
+    .seq-step {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 7px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+      background: rgba(148, 163, 184, 0.08);
+      border: 1px solid transparent;
+      white-space: nowrap;
+      transition: all 0.2s ease;
+    }
+    .seq-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+    .seq-step.done {
+      color: var(--accent-emerald);
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.12);
+    }
+    .seq-step.done .seq-dot {
+      background: var(--accent-emerald);
+      box-shadow: 0 0 6px var(--accent-emerald);
+    }
+    .seq-step.active {
+      color: var(--accent-amber);
+      border-color: rgba(245, 158, 11, 0.55);
+      background: rgba(245, 158, 11, 0.16);
+    }
+    .seq-step.active .seq-dot {
+      background: var(--accent-amber);
+      box-shadow: 0 0 8px var(--accent-amber);
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .btn-chip {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: all 0.15s ease;
+    }
+    .btn-chip:hover {
+      background: var(--bg-card-hover);
+      border-color: var(--accent-cyan);
+    }
+    .btn-chip.active {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+    }
+    .btn-chip:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+    /* 화면 언어 단추(한 / EN): 지금 언어만 밝게 */
+    .btn-lang [data-lang] { opacity: 0.5; }
+    .btn-lang [data-lang].on { opacity: 1; color: var(--accent-cyan); }
+    .btn-lang .lang-sep { opacity: 0.4; margin: 0 3px; }
+    /* 수동 배속이 상한에 걸림(work-log 96절) */
+    #warp-badge.capped {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: var(--accent-amber);
+      color: var(--accent-amber);
+    }
+    .vol-slider {
+      width: 64px;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    /* Left-Top Telemetry Glass Panel */
+    #telemetry-panel {
+      position: fixed;
+      top: 54px;
+      left: 10px;
+      width: 360px;
+      z-index: 15;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 10px;
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      max-height: calc(100vh - 200px);
+      overflow-y: auto;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+      padding-bottom: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      letter-spacing: 0.04em;
+    }
+
+    .tele-grid {
+      display: grid;
+      /* minmax(0, …): a long nowrap value ellipsises inside its cell instead of widening the grid */
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 5px;
+    }
+
+    .tele-cell {
+      min-width: 0;
+      background: var(--bg-card);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 6px;
+      padding: 4px 7px;
+    }
+
+    .tele-label {
+      font-size: 10px;
+      color: var(--text-secondary);
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+      white-space: nowrap;
+    }
+    .tele-label > span:first-child {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tele-label > span:last-child {
+      flex-shrink: 0;
+    }
+
+    .tele-val {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-top: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tele-val.cyan { color: var(--accent-cyan); }
+    .tele-val.emerald { color: var(--accent-emerald); }
+    .tele-val.amber { color: var(--accent-amber); }
+    .tele-val.rose { color: var(--accent-rose); }
+
+    /* Bottom Telemetry Cluster */
+    #bottom-bar {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      right: 430px;
+      z-index: 15;
+      display: flex;
+      align-items: flex-end;
+      gap: 10px;
+      pointer-events: none;
+    }
+
+    .bottom-card {
+      pointer-events: auto;
+      background: var(--bg-glass);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 8px 12px;
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .big-readouts {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .big-stat-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--text-secondary);
+    }
+    .big-stat-num {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--accent-cyan);
+      line-height: 1.1;
+    }
+    .big-stat-unit {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-left: 3px;
+    }
+
+    .stage-gauges {
+      flex: 1;
+      min-width: 160px;
+      max-width: 320px;
+    }
+    .gauge-row {
+      margin-bottom: 4px;
+    }
+    .gauge-row:last-child {
+      margin-bottom: 0;
+    }
+    .gauge-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      margin-bottom: 2px;
+    }
+    .gauge-track {
+      height: 7px;
+      background: rgba(148, 163, 184, 0.2);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .gauge-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-cyan));
+      transition: width 0.1s linear;
+    }
+    .gauge-fill.booster {
+      background: linear-gradient(90deg, var(--accent-amber), #fb923c);
+    }
+
+
+    /* 항법 미니맵(2D 지구-달 평면도, G 키, ui/nav-minimap.js). 발사 뒤에만 보임. 엔지니어 화면: 옛 궤도면 인셋 자리(오른쪽 콘솔
+       왼쪽 아래, 인셋 카드는 숨기고 아래 띠를 그만큼 좁힘). 중계 화면: 하단 띠 바로 위 오른쪽 끝(띠 높이는 ui-controller가 맞춤) */
+    #nav-minimap {
+      position: fixed;
+      right: 440px;
+      bottom: 10px;
+      width: 220px;
+      height: 150px;
+      z-index: 16;
+      pointer-events: none;
+      border-radius: 8px;
+      background: rgba(4, 8, 18, 0.82);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-glass);
+      overflow: hidden;
+    }
+    #nav-minimap[hidden] { display: none; }
+    #nav-minimap canvas { display: block; width: 100%; height: 100%; }
+    body.nav-mm-on:not(.ui-webcast) #bottom-bar { right: 670px; }
+    body.ui-webcast #nav-minimap {
+      right: 28px;
+      bottom: calc(max(18vh, 128px) + 8px);
+      background: rgba(0, 0, 0, 0.5);
+      border-color: rgba(255, 255, 255, 0.14);
+      box-shadow: 0 2px 18px rgba(0, 0, 0, 0.45);
+    }
+
+    /* Right Console (VAB & Flight Control) */
+    #right-console {
+      position: fixed;
+      top: 54px;
+      right: 10px;
+      bottom: 10px;
+      width: 410px;
+      z-index: 18;
+      background: var(--bg-glass-strong);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      box-shadow: var(--shadow-glass);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .console-mode-switcher {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      padding: 6px;
+      gap: 6px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+
+    .mode-btn {
+      padding: 7px 10px;
+      border-radius: 7px;
+      border: 1px solid var(--border-subtle);
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(56, 189, 248, 0.25), rgba(59, 130, 246, 0.25));
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+    }
+
+    .subtab-bar {
+      display: flex;
+      border-bottom: 1px solid var(--border-subtle);
+      background: rgba(15, 23, 42, 0.3);
+      overflow-x: auto;
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .subtab-bar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .subtab-btn {
+      flex: 1;
+      padding: 7px 6px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    .subtab-btn.active {
+      color: var(--accent-cyan);
+      border-bottom-color: var(--accent-cyan);
+      background: rgba(56, 189, 248, 0.08);
+    }
+
+    .console-body {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 10px;
+    }
+
+    .section-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 9px;
+      margin-bottom: 9px;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Form Controls */
+    .form-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+    .form-row label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      flex-shrink: 0;
+    }
+    select, input[type="number"], input[type="text"] {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 5px;
+      padding: 4px 7px;
+      font-size: 12px;
+      font-family: var(--font-sans);
+      min-width: 0;
+    }
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent-cyan);
+      cursor: pointer;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 9px 12px;
+      border-radius: 7px;
+      border: 1px solid var(--accent-cyan);
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      transition: filter 0.15s;
+    }
+    .btn-primary:hover {
+      filter: brightness(1.12);
+    }
+    /* 임무 설계의 발사 조건(CR-27): 표시 전용 */
+    .btn-primary:disabled,
+    .btn-primary:disabled:hover {
+      opacity: 0.45;
+      filter: none;
+      cursor: default;
+    }
+    .form-row input:disabled,
+    .form-row select:disabled {
+      opacity: 0.6;
+      cursor: default;
+    }
+    .btn-launch {
+      background: linear-gradient(135deg, #059669, #10b981);
+      border-color: #34d399;
+      font-size: 14px;
+      padding: 10px;
+      letter-spacing: 0.04em;
+    }
+    .btn-danger {
+      background: linear-gradient(135deg, #be123c, #e11d48);
+      border-color: #fb7185;
+      color: #fff;
+    }
+
+    /* Tables */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+    .data-table th, .data-table td {
+      padding: 4px 5px;
+      text-align: right;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+    }
+    .data-table th:first-child, .data-table td:first-child {
+      text-align: left;
+    }
+    .data-table th {
+      color: var(--text-secondary);
+      font-weight: 600;
+      font-size: 10px;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+    .badge-active { background: rgba(16, 185, 129, 0.2); color: var(--accent-emerald); border: 1px solid rgba(16, 185, 129, 0.4); }
+    .badge-retired { background: rgba(148, 163, 184, 0.2); color: var(--text-secondary); border: 1px solid rgba(148, 163, 184, 0.4); }
+    .badge-dev { background: rgba(245, 158, 11, 0.2); color: var(--accent-amber); border: 1px solid rgba(245, 158, 11, 0.4); }
+    .badge-est { background: rgba(168, 85, 247, 0.2); color: var(--accent-purple); border: 1px solid rgba(168, 85, 247, 0.4); }
+
+    /* Stack item list */
+    .stack-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      background: rgba(15, 23, 42, 0.45);
+      border: 1px solid var(--border-subtle);
+      margin-bottom: 5px;
+    }
+    .stack-item-info {
+      min-width: 0;
+      flex: 1;
+    }
+    .stack-item-title {
+      font-weight: 700;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stack-item-sub {
+      font-size: 10px;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+    }
+    .stack-item-btns {
+      display: flex;
+      gap: 3px;
+      flex-shrink: 0;
+    }
+    .icon-btn {
+      padding: 2px 6px;
+      font-size: 11px;
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .icon-btn:hover {
+      border-color: var(--accent-cyan);
+    }
+
+    /* Event Log */
+    .event-log-list {
+      max-height: 280px;
+      overflow-y: auto;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .event-item {
+      padding: 4px 6px;
+      border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+      display: flex;
+      gap: 8px;
+    }
+    .event-time {
+      color: var(--accent-cyan);
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /* Webcast (중계) layer: bottom band, stage panels, timeline, clock      */
+    /* ------------------------------------------------------------------ */
+    :root {
+      --wc-font: "Inter", "Helvetica Neue", "Segoe UI", Roboto, "Apple SD Gothic Neo", "Malgun Gothic", Arial, sans-serif;
+      --wc-label: #a3a9b3;
+      --wc-num: #ffffff;
+      --wc-dim: #5c636d;
+      --wc-accent: #ffffff;
+    }
+    #webcast-hud {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 14;
+      pointer-events: none;
+      font-family: var(--wc-font);
+      color: var(--wc-num);
+      -webkit-font-smoothing: antialiased;
+    }
+    body.ui-webcast #webcast-hud {
+      display: block;
+    }
+    body.ui-webcast #telemetry-panel,
+    body.ui-webcast #bottom-bar,
+    body.ui-webcast .seq-strip,
+    body.ui-webcast .met-box {
+      display: none !important;
+    }
+    body.ui-webcast.wc-live #right-console {
+      display: none !important;
+    }
+    body.ui-webcast #top-bar {
+      background: linear-gradient(to bottom, rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0));
+      border-bottom: 0;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
+    body.ui-webcast #top-bar .btn-chip {
+      background: rgba(0, 0, 0, 0.35);
+      border-color: rgba(255, 255, 255, 0.14);
+    }
+
+    .wc-top-left {
+      position: absolute;
+      top: 56px;
+      left: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 6px 60px 30px 0;
+      background: radial-gradient(ellipse at top left, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0) 72%);
+    }
+    .wc-live {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.22em;
+      color: var(--wc-label);
+    }
+    .wc-live-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #e5484d;
+      box-shadow: 0 0 8px rgba(229, 72, 77, 0.9);
+      animation: wc-blink 1.6s ease-in-out infinite;
+    }
+    @keyframes wc-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.35; }
+    }
+    .wc-mission {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.14em;
+      text-shadow: 0 1px 10px rgba(0, 0, 0, 0.7);
+    }
+    .wc-mission-sub {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.16em;
+      color: var(--wc-label);
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+    }
+    .wc-top-right {
+      position: absolute;
+      top: 56px;
+      right: 28px;
+      text-align: right;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 6px 0 30px 60px;
+      background: radial-gradient(ellipse at top right, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0) 72%);
+    }
+    .wc-cam {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      color: var(--wc-label);
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+    }
+    .wc-cam::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      margin-right: 7px;
+      border: 1.5px solid var(--wc-label);
+      border-radius: 2px;
+      vertical-align: 0;
+    }
+    .wc-status {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+    }
+
+    /* guidance off the autopilot (MANUAL / PROGRADE): hidden while the autopilot flies */
+    .wc-mode {
+      display: none;
+      align-self: flex-end;
+      margin-top: 4px;
+      padding: 3px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      color: #1a1205;
+      background: #f5b83d;
+      border-radius: 3px;
+      box-shadow: 0 1px 10px rgba(0, 0, 0, 0.5);
+    }
+    .wc-mode.show { display: block; }
+    .wc-mode.prograde { background: #7dd3fc; color: #04131c; }
+
+    .wc-callout {
+      position: absolute;
+      left: 50%;
+      top: 32%;
+      transform: translate(-50%, -50%) scale(0.92);
+      font-size: 44px;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      padding-left: 0.3em;
+      opacity: 0;
+      transition: opacity 0.35s ease, transform 0.35s ease;
+      text-shadow: 0 2px 24px rgba(0, 0, 0, 0.75);
+    }
+    .wc-callout.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+      transition: none; /* pop in, fade out */
+    }
+    .wc-count {
+      position: absolute;
+      left: 50%;
+      top: 44%;
+      transform: translate(-50%, -50%);
+      font-size: 96px;
+      font-weight: 300;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+      text-shadow: 0 2px 30px rgba(0, 0, 0, 0.8);
+    }
+    .wc-count.show {
+      opacity: 1;
+      transition: none;
+    }
+
+    .wc-band {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 18vh;
+      min-height: 128px;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.88) 0%, rgba(0, 0, 0, 0.72) 45%, rgba(0, 0, 0, 0.32) 80%, rgba(0, 0, 0, 0) 100%);
+      display: grid;
+      grid-template-columns: 1fr minmax(420px, 1.4fr) 1fr;
+      align-items: end;
+      padding: 0 32px 18px;
+      gap: 24px;
+    }
+    .wc-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+      transition: opacity 0.4s ease;
+    }
+    .wc-panel.dim {
+      opacity: 0.45;
+    }
+    .wc-panel.hidden {
+      visibility: hidden;
+    }
+    .wc-stage2 {
+      align-items: flex-end;
+      text-align: right;
+    }
+    .wc-stage-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.24em;
+      color: var(--wc-label);
+    }
+    .wc-readouts {
+      display: flex;
+      gap: 34px;
+    }
+    .wc-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      color: var(--wc-label);
+      margin-bottom: 2px;
+    }
+    .wc-num {
+      font-size: 34px;
+      font-weight: 500;
+      line-height: 1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+    }
+    .wc-unit {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      color: var(--wc-label);
+      margin-left: 7px;
+      vertical-align: 0.5em;
+    }
+    .wc-prop {
+      width: 100%;
+      max-width: 260px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.16);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .wc-prop-fill {
+      height: 100%;
+      width: 100%;
+      background: rgba(255, 255, 255, 0.85);
+      transition: width 0.3s linear;
+    }
+
+    .wc-centre {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding-bottom: 6px;
+    }
+    .wc-clock {
+      font-size: 30px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 1px 12px rgba(0, 0, 0, 0.7);
+    }
+    .wc-clock-row {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+    /* time acceleration (lunar missions coast at up to 5000x) */
+    .wc-warp {
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      font-variant-numeric: tabular-nums;
+      color: #fbbf24;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.7);
+    }
+    .wc-warp:empty {
+      display: none;
+    }
+    .wc-timeline {
+      position: relative;
+      width: 100%;
+      height: 36px;
+    }
+    .wc-tl-line, .wc-tl-fill {
+      position: absolute;
+      left: 0;
+      top: 8px;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.22);
+      width: 100%;
+      border-radius: 1px;
+    }
+    .wc-tl-fill {
+      width: 0%;
+      background: var(--wc-accent);
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.45);
+      transition: width 0.6s ease;
+    }
+    .wc-tl-mark {
+      position: absolute;
+      top: 0;
+      transform: translateX(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+    .wc-tl-dot {
+      width: 10px;
+      height: 10px;
+      margin-top: 4px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.35);
+      background: rgba(0, 0, 0, 0.6);
+      transition: all 0.3s ease;
+    }
+    .wc-tl-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.16em;
+      color: var(--wc-dim);
+      transition: color 0.3s ease;
+    }
+    .wc-tl-mark.done .wc-tl-dot {
+      background: #fff;
+      border-color: #fff;
+    }
+    .wc-tl-mark.done .wc-tl-label {
+      color: var(--wc-label);
+    }
+    .wc-tl-mark.current .wc-tl-dot {
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.18), 0 0 14px rgba(255, 255, 255, 0.8);
+    }
+    .wc-tl-mark.current .wc-tl-label {
+      color: #fff;
+      font-weight: 700;
+    }
+    .wc-tl-mark.next .wc-tl-label {
+      color: #8d949e;
+    }
+
+    /* B4: 카드·두 줄 타임라인이 들어가면 띠가 위로 자람(기본 화면은 예전 높이 그대로) */
+    .wc-band:has(.wc-stage1.fleet), .wc-band:has(.wc-timeline.two-rows), .wc-band:has(.wc-timeline.has-bands) { height: auto; min-height: max(18vh, 128px); padding-top: 40px; }
+    /* B4: 여러 기체 카드 (왼쪽 칸, 기체 목록이 있을 때만) */
+    .wc-fleet { display: none; flex-direction: column; gap: 10px; min-width: 0; }
+    .wc-stage1.fleet > :not(.wc-fleet) { display: none; }
+    .wc-stage1.fleet .wc-fleet { display: flex; }
+    .wc-card { display: flex; flex-direction: column; gap: 6px; min-width: 0; border-left: 2px solid transparent; transition: border-color 0.3s ease, padding 0.3s ease; }
+    .wc-card.focus { border-left-color: #fff; padding-left: 10px; }
+    .wc-card .wc-stage-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wc-card-phase { color: #fff; }
+    .wc-stage1.fleet-compact .wc-fleet { gap: 7px; }
+    .wc-stage1.fleet-compact .wc-card { gap: 2px; }
+    .wc-stage1.fleet-compact .wc-num { font-size: 19px; }
+    .wc-stage1.fleet-compact .wc-readouts { gap: 18px; }
+    .wc-stage1.fleet-compact .wc-label { font-size: 8px; margin-bottom: 1px; }
+    .wc-stage1.fleet-compact .wc-unit { font-size: 8px; margin-left: 4px; }
+    .wc-stage1.fleet-compact .wc-stage-title { font-size: 10px; }
+    .wc-stage1.fleet-compact .wc-prop { margin-top: 2px; max-width: 200px; height: 2px; }
+    .wc-stage2.focus .wc-stage-title { color: #fff; }
+
+    /* B4: 구간 띠 타임라인 — 줄 1(회수 1단·부스터)과 띠 탭 */
+    .wc-timeline.two-rows { height: 82px; }
+    .wc-timeline.has-bands { height: 56px; }
+    .wc-timeline.has-bands.two-rows { height: 100px; }
+    .wc-timeline.has-bands > .wc-tl-line, .wc-timeline.has-bands > .wc-tl-fill { top: 28px; }
+    .wc-timeline.has-bands > .wc-tl-mark { top: 20px; }
+    .wc-tl-row1 { position: absolute; top: 44px; height: 2px; }
+    .wc-tl-row1 .wc-tl-line, .wc-tl-row1 .wc-tl-fill { top: 0; }
+    .wc-tl-row1 .wc-tl-line { background: rgba(255, 255, 255, 0.14); }
+    .wc-tl-mark.row1 { top: 36px; }
+    .wc-timeline.has-bands .wc-tl-row1 { top: 64px; }
+    .wc-timeline.has-bands .wc-tl-mark.row1 { top: 56px; }
+    .wc-tl-mark.row1 .wc-tl-dot { width: 8px; height: 8px; margin-top: 5px; }
+    .wc-tl-mark.row1 .wc-tl-label { font-size: 9px; letter-spacing: 0.12em; }
+    /* 줄 1은 마커 사이가 좁아 이름을 두 높이에 번갈아 둠 */
+    .wc-tl-mark.row1.alt .wc-tl-label { margin-top: 11px; }
+    .wc-tl-tabs {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: var(--wc-dim);
+      white-space: nowrap;
+      overflow: hidden;
+    }
+    .wc-tl-tab.done { color: var(--wc-label); }
+    .wc-tl-tab.current { color: #fff; }
+
+    /* 타임라인 탐색: 재생 바(끌기·마커 클릭 → 점프, ▶/⏸ = K). 띠 묶음 #wc-scrub은 엔지니어 화면에서 #eng-scrub-slot으로 옮겨 감 */
+    .wc-scrub { position: relative; width: 100%; display: flex; align-items: flex-start; gap: 10px; pointer-events: auto; }
+    .wc-scrub .wc-timeline { flex: 1; min-width: 0; }
+    .wc-play {
+      flex: none; width: 26px; height: 26px; margin-top: -4px; padding: 0; border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.4); background: rgba(0, 0, 0, 0.55); color: #fff;
+      font: 700 11px/1 var(--wc-font); cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .wc-play:hover:not(:disabled) { border-color: #fff; box-shadow: 0 0 10px rgba(255, 255, 255, 0.35); }
+    .wc-play:disabled { opacity: 0.3; cursor: default; }
+    .wc-play.paused { border-color: #fbbf24; color: #fbbf24; box-shadow: 0 0 12px rgba(251, 191, 36, 0.4); }
+    .wc-timeline.has-bands ~ .wc-play, .wc-scrub:has(.wc-timeline.has-bands) .wc-play { margin-top: 16px; }
+    .wc-play-state {
+      position: absolute; left: 0; top: -22px; font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+      color: var(--wc-label); white-space: nowrap; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); pointer-events: none;
+    }
+    .wc-play-state.paused { color: #fbbf24; }
+    .wc-timeline.scrub-on { cursor: pointer; touch-action: none; }
+    .wc-timeline.dragging, .wc-timeline.dragging * { cursor: grabbing !important; }
+    .wc-timeline.scrub-on .wc-tl-fill { transition: width 0.25s linear; }
+    .wc-timeline.scrub-on .wc-tl-mark.seekable:hover .wc-tl-dot { border-color: #fff; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2); }
+    .wc-timeline.scrub-on .wc-tl-mark.seekable:hover .wc-tl-label { color: #fff; }
+    .wc-timeline.scrub-on .wc-tl-tab { cursor: pointer; }
+    .wc-timeline.scrub-on .wc-tl-tab:hover { color: #fff; }
+    .wc-tl-tabs { pointer-events: auto; }
+    /* 마커는 점(둘레 18 px)만 누름: 이름 상자는 옆 마커 점을 덮을 수 있음 */
+    .wc-timeline.scrub-on .wc-tl-mark { pointer-events: none; }
+    .wc-timeline.scrub-on .wc-tl-mark .wc-tl-dot { pointer-events: auto; position: relative; cursor: pointer; }
+    .wc-timeline.scrub-on .wc-tl-mark .wc-tl-dot::after { content: ''; position: absolute; left: -6px; right: -6px; top: -6px; bottom: -6px; border-radius: 50%; }
+    /* 마커 이름 겹침 피하기(webcast.js staggerLabels): 아래 칸으로, 그래도 겹치면 숨김(마우스를 올리면 이름·MET) */
+    .wc-tl-mark.lbl-alt:not(.row1) .wc-tl-label { margin-top: 11px; }
+    .wc-tl-mark.lbl-hide:not(.row1) .wc-tl-label { visibility: hidden; }
+    .wc-timeline.scrub-on .wc-tl-mark.lbl-hide:hover .wc-tl-label { visibility: visible; }
+    /* 아래 칸 이름이 있으면 줄 1(회수 1단·부스터)을 그만큼 내림 */
+    .wc-timeline.two-rows.has-alt { height: 92px; }
+    .wc-timeline.has-bands.two-rows.has-alt { height: 110px; }
+    .wc-timeline.has-alt .wc-tl-row1 { top: 56px; }
+    .wc-timeline.has-alt .wc-tl-mark.row1 { top: 48px; }
+    .wc-timeline.has-bands.has-alt .wc-tl-row1 { top: 76px; }
+    .wc-timeline.has-bands.has-alt .wc-tl-mark.row1 { top: 68px; }
+    .wc-tl-thumb {
+      position: absolute; top: 2px; width: 3px; height: 14px; margin-left: -1.5px; border-radius: 2px; background: #fff;
+      box-shadow: 0 0 8px rgba(255, 255, 255, 0.85); display: none; pointer-events: none; z-index: 2;
+    }
+    .wc-tl-thumb.show { display: block; }
+    .wc-timeline.has-bands .wc-tl-thumb { top: 22px; }
+    .wc-tl-bubble {
+      position: absolute; bottom: calc(100% + 6px); transform: translateX(-50%); padding: 3px 8px; border-radius: 4px;
+      background: rgba(0, 0, 0, 0.85); border: 1px solid rgba(255, 255, 255, 0.3); color: #fff; font-size: 11px;
+      font-weight: 600; letter-spacing: 0.06em; white-space: nowrap; font-variant-numeric: tabular-nums;
+      display: none; pointer-events: none; z-index: 3;
+    }
+    .wc-tl-bubble.show { display: block; }
+    .wc-tl-tick { position: absolute; top: 5px; width: 2px; height: 8px; margin-left: -1px; background: rgba(255, 255, 255, 0.3); }
+    .wc-tl-tick.done { background: rgba(255, 255, 255, 0.75); }
+    .wc-tl-tick::after { content: ''; position: absolute; left: -4px; right: -4px; top: -6px; bottom: -6px; }
+    .wc-timeline.has-bands .wc-tl-tick { top: 25px; }
+    .wc-tl-manual { position: absolute; top: 7px; height: 4px; border-radius: 2px; background: rgba(251, 191, 36, 0.6); display: none; pointer-events: none; }
+    .wc-tl-manual.show { display: block; }
+    .wc-tl-manual span { position: absolute; left: 0; top: -13px; font-size: 8px; font-weight: 700; letter-spacing: 0.12em; color: #fbbf24; }
+    .wc-timeline.has-bands .wc-tl-manual { top: 27px; }
+    #webcast-hud.wc-paused .wc-clock { color: #fbbf24; }
+    /* 엔지니어 화면: 같은 재생 바를 아래 띠 위 가운데에 축소해 둠(발사 뒤) */
+    #eng-scrub-slot {
+      display: none; position: fixed; left: 10px; right: 430px; bottom: 96px; z-index: 15; margin: 0 auto; max-width: 860px;
+      padding: 26px 18px 6px; border-radius: 10px; background: rgba(4, 8, 18, 0.82); border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-glass); font-family: var(--wc-font); color: #fff; -webkit-font-smoothing: antialiased;
+    }
+    body.wc-live:not(.ui-webcast) #eng-scrub-slot { display: block; }
+    body.nav-mm-on:not(.ui-webcast) #eng-scrub-slot { right: 670px; }
+    body:not(.nav-mm-on) #eng-scrub-slot { bottom: 190px; }
+    #eng-scrub-slot .wc-play-state { top: -20px; left: 36px; }
+    #eng-scrub-slot .wc-tl-label { font-size: 9px; letter-spacing: 0.1em; }
+
+    /* B4: 두 번째 화면(작은 화면 테두리, 분할 화면 가운데 선과 이름표). 캔버스 위, 중계 띠 아래 */
+    #view-frames { position: fixed; inset: 0; pointer-events: none; z-index: 13; }
+    #view-frames [hidden] { display: none !important; }
+    .view-inset { position: absolute; border: 1px solid rgba(255, 255, 255, 0.55); box-shadow: 0 2px 18px rgba(0, 0, 0, 0.55); border-radius: 2px; }
+    .view-caption {
+      position: absolute;
+      left: 8px;
+      top: 6px;
+      font-family: var(--wc-font);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.2em;
+      color: #fff;
+      white-space: nowrap;
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+    }
+    .view-split { position: absolute; inset: 0; }
+    .view-split-line { position: absolute; left: calc(50% - 1px); top: 0; bottom: 0; width: 2px; background: rgba(0, 0, 0, 0.85); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1); }
+    .view-caption.left { left: 28px; top: 136px; }
+    .view-caption.right { left: calc(50% + 18px); top: 136px; }
+    .btn-chip[hidden] { display: none !important; }
+
+    @media (max-width: 1100px) {
+      .wc-band { grid-template-columns: 1fr minmax(320px, 1.2fr) 1fr; padding: 0 18px 14px; gap: 14px; }
+      .wc-num { font-size: 26px; }
+      .wc-clock { font-size: 24px; }
+      .wc-readouts { gap: 18px; }
+      .wc-tl-label { font-size: 8px; letter-spacing: 0.1em; }
+    }
+
+    /* Mobile / Narrow Viewport (<= 820px and 400px target) */
+    #mobile-sheet-toggle {
+      display: none;
+    }
+
+    @media (max-width: 860px) {
+      #top-bar {
+        height: 42px;
+        padding: 0 6px;
+        gap: 4px;
+      }
+      .brand-title {
+        font-size: 11px;
+      }
+      .seq-strip {
+        display: none;
+      }
+      /* 좁은 화면: 단추 줄이 넘치면 잘리지 않고 가로로 밀어 볼 수 있게(언어 단추·영어 문구로 길어짐) */
+      .top-actions {
+        flex-shrink: 1;
+        min-width: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .top-actions::-webkit-scrollbar {
+        display: none;
+      }
+      #btn-light-toggle {
+        display: none;
+      }
+      #telemetry-panel {
+        top: 46px;
+        left: 6px;
+        width: calc(100vw - 12px);
+        max-height: 155px;
+        padding: 6px;
+      }
+      .tele-grid {
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 4px;
+      }
+      .tele-cell {
+        padding: 3px 5px;
+      }
+      .tele-val {
+        font-size: 11px;
+      }
+      #bottom-bar {
+        left: 6px;
+        right: 6px;
+        bottom: 44vh;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .big-stat-num {
+        font-size: 16px;
+      }
+      .stage-gauges {
+        display: none;
+      }
+      #nav-minimap,
+      body.ui-webcast #nav-minimap {
+        right: 6px;
+        left: auto;
+        width: 176px;
+        height: 120px;
+      }
+      #nav-minimap { bottom: calc(44vh + 64px); }
+      body.nav-mm-on:not(.ui-webcast) #bottom-bar { right: 6px; }
+      #eng-scrub-slot, body.nav-mm-on:not(.ui-webcast) #eng-scrub-slot, body:not(.nav-mm-on) #eng-scrub-slot { left: 6px; right: 190px; bottom: calc(44vh + 64px); padding: 24px 10px 4px; }
+      #right-console {
+        top: auto;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100vw;
+        height: 43vh;
+        border-radius: 14px 14px 0 0;
+        transition: height 0.25s ease;
+      }
+      #right-console.sheet-minimized {
+        height: 42px;
+      }
+      #right-console.sheet-expanded {
+        height: 76vh;
+      }
+      #mobile-sheet-toggle {
+        display: inline-block;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- 3D Viewport -->
+  <div id="canvas-container"><div id="entry-fx-blackout" hidden data-i18n="hud.blackout"></div></div>
+
+  <!-- Procedural Planet Texture Progress Bar -->
+  <div id="tex-loading-overlay">
+    <span id="tex-loading-label" style="font-size:11px;font-weight:600;" data-i18n="top.texLoading"></span>
+    <div class="tex-progress-bar">
+      <div id="tex-progress-fill" class="tex-progress-fill"></div>
+    </div>
+    <span id="tex-progress-pct" style="font-family:var(--font-mono);font-size:11px;">0%</span>
+  </div>
+
+  <!-- Top Mission Control Bar -->
+  <header id="top-bar">
+    <div class="brand-cluster">
+      <span class="brand-title" data-i18n="top.brand"></span>
+      <div class="met-box" id="met-display">T+ 00:00:00.0</div>
+    </div>
+
+    <div class="seq-strip" id="seq-strip">
+      <div class="seq-step" data-seq="liftoff"><span class="seq-dot"></span>LIFTOFF</div>
+      <div class="seq-step" data-seq="maxQ"><span class="seq-dot"></span>MAX-Q</div>
+      <div class="seq-step" data-seq="boosterSep"><span class="seq-dot"></span>BOOSTER SEP</div>
+      <div class="seq-step" data-seq="stageSep"><span class="seq-dot"></span>STAGE SEP</div>
+      <div class="seq-step" data-seq="meco"><span class="seq-dot"></span>MECO</div>
+      <div class="seq-step" data-seq="circBurn"><span class="seq-dot"></span>CIRC BURN</div>
+      <div class="seq-step" data-seq="orbit"><span class="seq-dot"></span>ORBIT</div>
+    </div>
+
+    <div class="top-actions">
+      <button class="btn-chip" id="btn-warp-down" data-i18n-title="top.warpDownTitle">◀</button>
+      <span class="btn-chip active" id="warp-badge" style="font-family:var(--font-mono);" data-i18n="top.warpInit"></span>
+      <button class="btn-chip" id="btn-warp-up" data-i18n-title="top.warpUpTitle">▶</button>
+      <button class="btn-chip active" id="btn-warp-auto" data-i18n-title="top.warpAutoBtnTitle" data-i18n="top.warpAutoBtn"></button>
+      <button class="btn-chip" id="btn-ui-view" data-i18n-title="top.viewTitle" data-i18n="top.viewEngineer"></button>
+      <button class="btn-chip" id="btn-camera-mode" data-i18n-title="top.camTitle" aria-haspopup="menu" aria-expanded="false" aria-controls="camera-menu" data-i18n="top.cam.broadcast"></button>
+      <button class="btn-chip" id="btn-focus" data-i18n-title="top.focusTitle" data-i18n="top.focusInit" hidden></button>
+      <button class="btn-chip" id="btn-layout" data-i18n-title="top.layoutTitle" data-i18n="top.layoutInit" hidden></button>
+      <button class="btn-chip btn-lang" id="btn-lang" type="button" data-i18n-title="top.langTitle"><span data-lang="ko"></span><span class="lang-sep">/</span><span data-lang="en"></span></button>
+      <button class="btn-chip" id="btn-quality-toggle" data-i18n-title="top.qualityTitle" data-i18n="top.qualityInit"></button>
+      <button class="btn-chip" id="btn-audio-toggle" data-i18n-title="top.audioTitle" data-i18n="top.audioInit"></button>
+      <input type="range" class="vol-slider" id="rng-volume" min="0" max="100" step="1" value="80" data-i18n-title="top.volume" data-i18n-aria="top.volume" />
+      <button class="btn-chip" id="btn-tod-toggle" data-i18n-title="top.todTitle" data-i18n="top.todInit"></button>
+      <button class="btn-chip" id="btn-light-toggle" data-i18n-title="top.lightTitle" data-i18n="top.lightInit"></button>
+      <span class="btn-chip" id="gfx-badge" data-i18n-title="top.gfxTitle">GPU…</span>
+      <button class="btn-chip" id="mobile-sheet-toggle" data-i18n-title="top.sheetTitle" data-i18n="top.sheetPanel"></button>
+    </div>
+  </header>
+
+  <!-- Camera picker: opened from #btn-camera-mode (outside #top-bar, which clips its overflow) -->
+  <div id="camera-menu" role="menu" data-i18n-aria="top.camMenu" hidden></div>
+
+  <!-- Left-Top Glass Telemetry Panel -->
+  <aside id="telemetry-panel">
+    <div class="panel-header">
+      <span id="tele-vessel-name">Falcon 9 Block 5</span>
+      <span id="tele-mode-badge" class="badge badge-active" data-i18n="hud.modeInit"></span>
+    </div>
+    <div class="tele-grid">
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleSpeed"></span><span>m/s</span></div>
+        <div class="tele-val cyan" id="tele-speed-pair">0 / 0</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleVel"></span><span>m/s</span></div>
+        <div class="tele-val" id="tele-vv-vh">0.0 / 0.0</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleAp"></span><span>km</span></div>
+        <div class="tele-val emerald" id="tele-ap">0.00</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.telePe"></span><span>km</span></div>
+        <div class="tele-val emerald" id="tele-pe">0.00</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleInc"></span><span>°</span></div>
+        <div class="tele-val" id="tele-inc-raan">28.5° / 0.0°</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleEcc"></span><span></span></div>
+        <div class="tele-val" id="tele-ecc-period" data-i18n="hud.eccPeriodInit"></div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleTimeTo"></span><span>s</span></div>
+        <div class="tele-val" id="tele-tap-tpe">0s / 0s</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleQ"></span><span>kPa</span></div>
+        <div class="tele-val amber" id="tele-q-maxq">0.0 / 0.0</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleTwr"></span><span>g</span></div>
+        <div class="tele-val" id="tele-twr-acc">1.36 / 1.00g</div>
+      </div>
+      <div class="tele-cell">
+        <div class="tele-label"><span data-i18n="hud.teleStage"></span><span>m/s</span></div>
+        <div class="tele-val cyan" id="tele-stage-dv" data-i18n="hud.stageDvInit"></div>
+      </div>
+      <div class="tele-cell" style="grid-column: span 2;">
+        <div class="tele-label"><span data-i18n="hud.teleAtt"></span><span id="tele-guidance-mode">AUTO</span></div>
+        <div class="tele-val" id="tele-attitude">90.0° / 90.0° / 0%</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Bottom Bar: Large Readouts + Stage Fuel Gauges + 2D Orbit Inset -->
+  <section id="bottom-bar">
+    <div class="bottom-card big-readouts">
+      <div>
+        <div class="big-stat-label" data-i18n="hud.bigSpeed"></div>
+        <div><span class="big-stat-num" id="big-speed">0.0</span><span class="big-stat-unit">m/s</span></div>
+      </div>
+      <div style="width:1px;height:32px;background:var(--border-subtle);"></div>
+      <div>
+        <div class="big-stat-label" data-i18n="hud.bigAlt"></div>
+        <div><span class="big-stat-num" id="big-alt">0.00</span><span class="big-stat-unit" id="big-alt-unit">km</span></div>
+      </div>
+    </div>
+
+    <div class="bottom-card stage-gauges" id="stage-gauges-box">
+      <!-- Populated dynamically -->
+    </div>
+
+  </section>
+
+  <!-- 엔지니어 화면의 재생 바 자리(중계 띠의 #wc-scrub을 화면 전환 때 옮겨 옴, ui-controller.js placeScrub) -->
+  <div id="eng-scrub-slot"></div>
+
+  <!-- 항법 미니맵(G 키): 그림은 ui/nav-minimap.js -->
+  <div id="nav-minimap" aria-hidden="true" hidden><canvas width="440" height="300"></canvas></div>
+
+  <!-- 두 번째 화면(B4): 작은 화면(PIP) 테두리와 분할 화면 가운데 선·이름표. 그림은 캔버스(scene-renderer.js)가 그림 -->
+  <div id="view-frames" aria-hidden="true">
+    <div class="view-inset" id="view-inset" hidden><div class="view-caption" id="view-inset-caption"></div></div>
+    <div class="view-split" id="view-split" hidden>
+      <div class="view-split-line"></div>
+      <div class="view-caption left" id="view-split-left"></div>
+      <div class="view-caption right" id="view-split-right"></div>
+    </div>
+  </div>
+
+  <!-- Webcast (중계) layer: hidden in engineer view -->
+  <div id="webcast-hud" aria-hidden="true">
+    <div class="wc-top-left">
+      <div class="wc-live"><span class="wc-live-dot"></span>LIVE</div>
+      <div class="wc-mission" id="wc-mission">FALCON 9 BLOCK 5</div>
+      <div class="wc-mission-sub" id="wc-mission-sub"></div>
+    </div>
+    <div class="wc-top-right">
+      <div class="wc-cam" id="wc-cam">PAD WIDE</div>
+      <div class="wc-status" id="wc-status">T-10 AND HOLDING</div>
+      <div class="wc-mode" id="wc-mode"></div>
+    </div>
+    <div class="wc-callout" id="wc-callout"></div>
+    <div class="wc-count" id="wc-count">10</div>
+    <div class="wc-band">
+      <div class="wc-panel wc-stage1" id="wc-stage1">
+        <div class="wc-stage-title" id="wc-s1-title">STAGE 1</div>
+        <div class="wc-readouts">
+          <div class="wc-stat"><div class="wc-label">SPEED</div><div class="wc-num"><span id="wc-s1-speed">0</span><span class="wc-unit">KM/H</span></div></div>
+          <div class="wc-stat"><div class="wc-label">ALTITUDE</div><div class="wc-num"><span id="wc-s1-alt">0.0</span><span class="wc-unit">KM</span></div></div>
+        </div>
+        <div class="wc-prop"><div class="wc-prop-fill" id="wc-s1-prop"></div></div>
+        <div class="wc-fleet" id="wc-fleet"></div>
+      </div>
+      <div class="wc-centre">
+        <div class="wc-clock-row"><div class="wc-clock" id="wc-clock">T-00:00:10</div><div class="wc-warp" id="wc-warp"></div></div>
+        <!-- 재생 바(타임라인 탐색): 끌기·마커 클릭으로 점프, ▶/⏸ = K. 엔지니어 화면에서는 이 묶음을 #eng-scrub-slot으로 옮겨 씀 -->
+        <div class="wc-scrub" id="wc-scrub">
+          <button class="wc-play" id="wc-play" type="button" data-i18n-title="hud.playPauseKey" data-i18n-aria="hud.playPause" disabled>▶</button>
+          <div class="wc-timeline" id="wc-timeline"><div class="wc-tl-line"></div><div class="wc-tl-fill" id="wc-tl-fill"></div></div>
+          <div class="wc-play-state" id="wc-play-state" aria-live="polite"></div>
+        </div>
+      </div>
+      <div class="wc-panel wc-stage2" id="wc-stage2">
+        <div class="wc-stage-title" id="wc-s2-title">STAGE 2</div>
+        <div class="wc-readouts">
+          <div class="wc-stat"><div class="wc-label">SPEED</div><div class="wc-num"><span id="wc-s2-speed">0</span><span class="wc-unit">KM/H</span></div></div>
+          <div class="wc-stat"><div class="wc-label">ALTITUDE</div><div class="wc-num"><span id="wc-s2-alt">0.0</span><span class="wc-unit">KM</span></div></div>
+          <div class="wc-stat" id="wc-s2-x" style="display:none"><div class="wc-label" id="wc-s2-x-label"></div><div class="wc-num"><span id="wc-s2-x-num"></span><span class="wc-unit" id="wc-s2-x-unit"></span></div></div>
+        </div>
+        <div class="wc-prop"><div class="wc-prop-fill" id="wc-s2-prop"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Console: VAB (조립동) <-> Launch Control (발사 관제) -->
+  <aside id="right-console">
+    <div class="console-mode-switcher">
+      <button class="mode-btn active" id="btn-mode-vab" data-i18n="vab.modeBtn"></button>
+      <button class="mode-btn" id="btn-mode-flight" data-i18n="flight.modeBtn"></button>
+    </div>
+
+    <!-- VAB Subtabs -->
+    <div class="subtab-bar" id="vab-subtabs">
+      <button class="subtab-btn active" data-vabtab="presets" data-i18n="vab.tabPresets"></button>
+      <button class="subtab-btn" data-vabtab="stack" data-i18n="vab.tabStack"></button>
+      <button class="subtab-btn" data-vabtab="boosters" data-i18n="vab.tabBoosters"></button>
+      <button class="subtab-btn" data-vabtab="launchcond" data-i18n="vab.tabLaunch"></button>
+      <button class="subtab-btn" data-vabtab="analysis" data-i18n="vab.tabAnalysis"></button>
+    </div>
+
+    <!-- Flight Subtabs -->
+    <div class="subtab-bar" id="flight-subtabs" style="display:none;">
+      <button class="subtab-btn active" data-flighttab="controls" data-i18n="flight.tabControls"></button>
+      <button class="subtab-btn" data-flighttab="orbit" data-i18n="flight.tabOrbit"></button>
+      <button class="subtab-btn" data-flighttab="log" data-i18n="flight.tabLog"></button>
+    </div>
+
+    <!-- Console Scrollable Content -->
+    <div class="console-body" id="console-body"></div>
+  </aside>
+
+  <script src="audio.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
